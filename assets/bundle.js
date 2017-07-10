@@ -390,7 +390,7 @@ Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__components_PeerJs__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__communicator__ = __webpack_require__(5);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__tuner__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__components_TunerC__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__components_TunerC__ = __webpack_require__(12);
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -419,9 +419,6 @@ function main() {
         if (m) {
             yield communicator.prepare();
             __WEBPACK_IMPORTED_MODULE_1_react_dom__["render"](__WEBPACK_IMPORTED_MODULE_0_react__["createElement"](__WEBPACK_IMPORTED_MODULE_2__components_PeerJs__["a" /* PeerJs */], { communicator: communicator }), document.getElementById("main"));
-            communicator.on("recieve", e => {
-                console.log(e);
-            });
         }
         else {
             __WEBPACK_IMPORTED_MODULE_1_react_dom__["render"](__WEBPACK_IMPORTED_MODULE_0_react__["createElement"](__WEBPACK_IMPORTED_MODULE_5__components_TunerC__["a" /* TunerC */], { communicator: communicator }), document.getElementById("main"));
@@ -637,91 +634,32 @@ module.exports = Peer;
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__note__ = __webpack_require__(8);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__pitcher__ = __webpack_require__(9);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__pitcher__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__tunerView__ = __webpack_require__(10);
 
 
 class Tuner {
     constructor() {
         this.audioContext = null;
-        this.canvas = null;
-        this.canvasContext = null;
         this.onData = null;
+        this.view = new __WEBPACK_IMPORTED_MODULE_1__tunerView__["a" /* TunerView */]();
     }
-    setPixel(imageData, x, y, color) {
-        const width = imageData.width;
-        const data = imageData.data;
-        const index = ((width * y) + x) * 4;
-        if (!isNaN(color.r)) {
-            data[index] = color.r;
-        }
-        if (!isNaN(color.g)) {
-            data[index + 1] = color.g;
-        }
-        if (!isNaN(color.b)) {
-            data[index + 2] = color.b;
-        }
-        if (!isNaN(color.a)) {
-            return data[index + 3] = color.a;
-        }
-    }
-    drawWave(buffer, note) {
-        let x, y;
-        this.canvasContext.save();
-        this.canvasContext.fillStyle = "rgb(30, 30, 30)";
-        this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        this.canvasContext.restore();
-        const imageData = this.canvasContext.getImageData(0, 0, this.canvas.width, this.canvas.height);
-        const color = {
-            r: 200,
-            g: 200,
-            b: 200,
-            a: 255
-        };
-        const red = {
-            r: 200,
-            g: 0,
-            b: 0,
-            a: 255
-        };
-        const width = imageData.width;
-        const height = imageData.height;
-        for (let x = 0; x < width; x++) {
-            y = Math.floor(height / 2 + buffer[x * 2] * height);
-            this.setPixel(imageData, x, y, color);
-        }
-        x = Math.round(width / 2 + width * note.diff());
-        for (let y = 0; y < height; y++) {
-            this.setPixel(imageData, x, y, color);
-            this.setPixel(imageData, width / 2, y, red);
-        }
-        this.canvasContext.putImageData(imageData, 0, 0);
-    }
-    ;
     connectRecorder(stream) {
         this.audioContext = new AudioContext();
-        const hzElement = document.getElementById("hz");
-        const noteElement = document.getElementById("note");
         const bufferSize = 2048;
         const recorder = this.audioContext.createScriptProcessor(bufferSize, 2, 2);
         let counter = 0;
         recorder.onaudioprocess = (e) => {
-            const span = document.hasFocus() ? 2 : 32;
+            const span = document.hasFocus() ? 2 : 20;
             if (counter++ % span != 0) {
                 return;
             }
             const left = e.inputBuffer.getChannelData(0);
-            const hz = __WEBPACK_IMPORTED_MODULE_1__pitcher__["a" /* default */].pitch(left, this.audioContext.sampleRate);
+            const hz = __WEBPACK_IMPORTED_MODULE_0__pitcher__["a" /* default */].pitch(left, this.audioContext.sampleRate);
             if (this.onData) {
                 this.onData(hz);
             }
-            const note = new __WEBPACK_IMPORTED_MODULE_0__note__["a" /* default */](hz);
-            this.drawWave(left, note);
-            if (!(hz >= 30)) {
-                return;
-            }
-            hzElement.innerHTML = 'hz = ' + hz;
-            noteElement.innerHTML = 'note = ' + note.name();
+            this.view.draw(left, hz);
         };
         const input = this.audioContext.createMediaStreamSource(stream);
         input.connect(recorder);
@@ -741,8 +679,6 @@ class Tuner {
             return;
         }
         nav.getUserMedia({ audio: true }, this.connectRecorder.bind(this), () => { alert("error capturing audio."); });
-        this.canvas = document.getElementById("wave");
-        this.canvasContext = this.canvas.getContext("2d");
     }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = Tuner;
@@ -754,31 +690,7 @@ class Tuner {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-class Note {
-    constructor(hz) {
-        this.hz = hz;
-        this.base = 55;
-        this.note = Math.log(this.hz / this.base) / Math.log(2) * 12;
-    }
-    name() {
-        const names = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"];
-        const note12 = (this.note >= 0) ? this.note % 12 : this.note % 12 + 12;
-        var i = Math.floor((note12 + 0.5) % 12);
-        return names[i];
-    }
-    diff() {
-        return (this.note + 0.5) % 1 - 0.5;
-    }
-}
-/* harmony default export */ __webpack_exports__["a"] = (Note);
-
-
-/***/ }),
-/* 9 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__complex__ = __webpack_require__(10);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__complex__ = __webpack_require__(9);
 
 class Pitcher {
     static parabola(nsdf, i) {
@@ -904,7 +816,7 @@ class FFT {
 
 
 /***/ }),
-/* 10 */
+/* 9 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -963,7 +875,114 @@ class Complex {
 
 
 /***/ }),
+/* 10 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__note__ = __webpack_require__(11);
+
+class TunerView {
+    constructor() {
+        // this.canvas = null;
+        // this.canvasContext = null;
+        this.canvas = document.getElementById("wave");
+        this.canvasContext = this.canvas.getContext("2d");
+        this.hzElement = document.getElementById("hz");
+        this.noteElement = document.getElementById("note");
+    }
+    setPixel(imageData, x, y, color) {
+        const width = imageData.width;
+        const data = imageData.data;
+        const index = ((width * y) + x) * 4;
+        if (!isNaN(color.r)) {
+            data[index] = color.r;
+        }
+        if (!isNaN(color.g)) {
+            data[index + 1] = color.g;
+        }
+        if (!isNaN(color.b)) {
+            data[index + 2] = color.b;
+        }
+        if (!isNaN(color.a)) {
+            return data[index + 3] = color.a;
+        }
+    }
+    drawWave(buffer, note) {
+        let x, y;
+        this.canvasContext.save();
+        this.canvasContext.fillStyle = "rgb(30, 30, 30)";
+        this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.canvasContext.restore();
+        const imageData = this.canvasContext.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const color = {
+            r: 200,
+            g: 200,
+            b: 200,
+            a: 255
+        };
+        const red = {
+            r: 200,
+            g: 0,
+            b: 0,
+            a: 255
+        };
+        const width = imageData.width;
+        const height = imageData.height;
+        for (let x = 0; x < width; x++) {
+            y = Math.floor(height / 2 + buffer[x * 2] * height);
+            this.setPixel(imageData, x, y, color);
+        }
+        x = Math.round(width / 2 + width * note.diff());
+        for (let y = 0; y < height; y++) {
+            this.setPixel(imageData, x, y, color);
+            this.setPixel(imageData, width / 2, y, red);
+        }
+        this.canvasContext.putImageData(imageData, 0, 0);
+    }
+    ;
+    setText(hz, note) {
+        this.hzElement.innerHTML = 'hz = ' + hz;
+        this.noteElement.innerHTML = 'note = ' + note.name();
+    }
+    draw(wave, hz) {
+        const note = new __WEBPACK_IMPORTED_MODULE_0__note__["a" /* default */](hz);
+        this.drawWave(wave, note);
+        if (hz < 30) {
+            return;
+        }
+        this.setText(hz, note);
+    }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = TunerView;
+
+
+
+/***/ }),
 /* 11 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+class Note {
+    constructor(hz) {
+        this.hz = hz;
+        this.base = 55;
+        this.note = Math.log(this.hz / this.base) / Math.log(2) * 12;
+    }
+    name() {
+        const names = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"];
+        const note12 = (this.note >= 0) ? this.note % 12 : this.note % 12 + 12;
+        var i = Math.floor((note12 + 0.5) % 12);
+        return names[i];
+    }
+    diff() {
+        return (this.note + 0.5) % 1 - 0.5;
+    }
+}
+/* harmony default export */ __webpack_exports__["a"] = (Note);
+
+
+/***/ }),
+/* 12 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
