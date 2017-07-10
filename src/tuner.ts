@@ -1,81 +1,25 @@
 import Note from './note';
 import Pitcher from './pitcher';
+import { TunerView } from './tunerView';
 
 export class Tuner{
   audioContext;
-  canvas;
-  canvasContext;
   onData;
+  view;
 
   constructor(){
     this.audioContext = null;
-    this.canvas = null;
-    this.canvasContext = null;
     this.onData = null;
+    this.view= new TunerView();
   }
-
-  setPixel(imageData, x: number, y: number, color) {
-    const width = imageData.width;
-    const data = imageData.data;
-    const index = ((width * y) + x) * 4;
-    if (!isNaN(color.r)) {
-      data[index] = color.r;
-    }
-    if (!isNaN(color.g)) {
-      data[index + 1] = color.g;
-    }
-    if (!isNaN(color.b)) {
-      data[index + 2] = color.b;
-    }
-    if (!isNaN(color.a)) {
-      return data[index + 3] = color.a;
-    }
-  }
-
-  drawWave(buffer, note: Note) {
-    let x, y;
-    this.canvasContext.save();
-    this.canvasContext.fillStyle = "rgb(30, 30, 30)";
-    this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    this.canvasContext.restore();
-    const imageData = this.canvasContext.getImageData(0, 0, this.canvas.width, this.canvas.height);
-    const color = {
-      r: 200,
-      g: 200,
-      b: 200,
-      a: 255
-    };
-    const red = {
-      r: 200,
-      g: 0,
-      b: 0,
-      a: 255
-    };
-
-    const width = imageData.width;
-    const height = imageData.height;
-    for (let x = 0; x < width; x++){
-      y = Math.floor(height/2+buffer[x*2]*height)
-      this.setPixel(imageData, x, y, color);
-    }
-
-    x = Math.round(width/2 + width * note.diff())
-    for (let y = 0; y < height; y++){
-      this.setPixel(imageData, x, y, color);
-      this.setPixel(imageData, width/2, y, red);
-    }
-    this.canvasContext.putImageData(imageData, 0, 0);
-  };
 
   connectRecorder(stream) {
     this.audioContext = new AudioContext();
-    const hzElement = document.getElementById("hz");
-    const noteElement = document.getElementById("note");
     const bufferSize = 2048;
     const recorder = this.audioContext.createScriptProcessor(bufferSize, 2, 2);
     let counter = 0;
     recorder.onaudioprocess = (e)=> {
-      const span = document.hasFocus() ? 2 : 32;
+      const span = document.hasFocus() ? 2 : 20;
       if (counter++ % span != 0) {
         return;
       }
@@ -85,14 +29,9 @@ export class Tuner{
         this.onData(hz);
       }
 
-      const note = new Note(hz);
-      this.drawWave(left, note);
-      if (!(hz >= 30)) {
-        return;
-      }
-      hzElement.innerHTML = 'hz = ' + hz;
-      noteElement.innerHTML = 'note = ' + note.name();
+      this.view.draw(left, hz);
     };
+
     const input = this.audioContext.createMediaStreamSource(stream);
     input.connect(recorder);
     return recorder.connect(this.audioContext.destination);
@@ -117,8 +56,6 @@ export class Tuner{
       { audio: true },
       this.connectRecorder.bind(this), ()=> {alert("error capturing audio.");}
     );
-    this.canvas = document.getElementById("wave");
-    this.canvasContext = this.canvas.getContext("2d");
   }
 }
 

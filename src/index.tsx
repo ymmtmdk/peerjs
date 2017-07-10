@@ -21,9 +21,6 @@ async function main(){
       <PeerJs communicator={communicator} />,
       document.getElementById("main")
     );
-    communicator.on("recieve", e=>{
-      console.log(e);
-    });
   }
   else{
     ReactDOM.render(
